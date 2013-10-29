@@ -101,6 +101,7 @@
     <Prefer32Bit>true</Prefer32Bit>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="AutofacFrameAdapter.cs" />
     <Compile Include="CaliburnAutofacApplication.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
@@ -108,14 +109,20 @@
     <Reference Include="Autofac">
       <HintPath>..\packages\Autofac.3.0.1\lib\portable-win+net40+sl50+wp8\Autofac.dll</HintPath>
     </Reference>
-    <Reference Include="Caliburn.Micro">
-      <HintPath>..\packages\Caliburn.Micro.1.4\lib\win8\Caliburn.Micro.dll</HintPath>
+    <Reference Include="Caliburn.Micro, Version=1.5.2.0, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\packages\Caliburn.Micro.1.5.2\lib\win8\Caliburn.Micro.dll</HintPath>
     </Reference>
-    <Reference Include="Caliburn.Micro.Extensions">
-      <HintPath>..\packages\Caliburn.Micro.1.4\lib\win8\Caliburn.Micro.Extensions.dll</HintPath>
+    <Reference Include="Caliburn.Micro.Extensions, Version=1.5.2.0, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\packages\Caliburn.Micro.1.5.2\lib\win8\Caliburn.Micro.Extensions.dll</HintPath>
     </Reference>
-    <Reference Include="Windows.UI.Interactivity">
-      <HintPath>..\packages\Windows.UI.Interactivity.1.0.2.0\lib\winrt45\Windows.UI.Interactivity.dll</HintPath>
+    <Reference Include="Callisto">
+      <HintPath>..\packages\Callisto.1.2.9\lib\winrt45\Callisto.dll</HintPath>
+    </Reference>
+    <Reference Include="Windows.UI.Interactivity, Version=1.1.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\packages\Windows.UI.Interactivity.1.1.0.0\lib\win\Windows.UI.Interactivity.dll</HintPath>
     </Reference>
   </ItemGroup>
   <ItemGroup>
