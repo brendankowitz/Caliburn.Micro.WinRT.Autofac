@@ -1,6 +1,8 @@
 ﻿using System.Collections.ObjectModel;
+using System.Windows.Input;
 using Caliburn.Micro.WinRT.Autofac.Sample.Entities;
 using Caliburn.Micro.WinRT.Autofac.Sample.Events;
+using Caliburn.Micro.WinRT.Autofac.Sample.Infrastructure;
 
 namespace Caliburn.Micro.WinRT.Autofac.Sample.ViewModels
 {
@@ -16,6 +18,7 @@ namespace Caliburn.Micro.WinRT.Autofac.Sample.ViewModels
             RightMenu = rightMenuViewModel;
             People = new ObservableCollection<Person>();
             _messenger.Subscribe(this);
+            ToViewTwo = new ActionCommand(x => navigationService.NavigateToViewModel<SecondViewModel>());
         }
 
         private string _loadMessage;
@@ -37,6 +40,8 @@ namespace Caliburn.Micro.WinRT.Autofac.Sample.ViewModels
         }
 
         public RightMenuViewModel RightMenu { get; set; }
+
+        public ICommand ToViewTwo { get; set; }
 
         public void LoadPeople()
         {

@@ -4,7 +4,6 @@ using System.ComponentModel;
 using System.Linq;
 using Autofac;
 using Autofac.Core;
-using Caliburn.Micro;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
 using System.Diagnostics;
@@ -18,11 +17,22 @@ namespace Caliburn.Micro.WinRT.Autofac
         private AutofacFrameAdapter _frameAdapter;
         private Frame _rootFrame;
         readonly IDictionary<WeakReference, ILifetimeScope> _viewsToScope = new Dictionary<WeakReference, ILifetimeScope>();
+        private bool _enableViewCacheManagement = true;
         private static Type[] _exportedTypeCache;
         protected object NavigationContext { get; set; }
 
         public event Action<object> Activated = _ => { };
         protected ISharingService SharingService { get; private set; }
+
+        /// <summary>
+        /// All pages in the back stack will be set to cachemode 'Required'.
+        /// When navigating away from a page, the view will be set to cachemode disabled and flushed, emulating behavior closer to WP8.
+        /// </summary>
+        public virtual bool EnableViewCacheManagement
+        {
+            get { return _enableViewCacheManagement; }
+            set { _enableViewCacheManagement = value; }
+        }
 
         protected CaliburnAutofacApplication()
         {
@@ -38,12 +48,7 @@ namespace Caliburn.Micro.WinRT.Autofac
             _builder.RegisterType<SharingService>().As<ISharingService>().SingleInstance();
             _builder.RegisterType<SettingsService>().As<ISettingsService>().SingleInstance();
 
-            _builder.RegisterAssemblyTypes(AssemblySource.Instance.ToArray())
-                .Where(x => !string.IsNullOrEmpty(x.Namespace) && x.Namespace.Contains("ViewModels"))
-                .AssignableTo<INotifyPropertyChanged>()
-                .AsSelf()
-                .InstancePerLifetimeScope()
-                .OnActivated(OnActivated);
+            RegisterViewModels(x => !string.IsNullOrEmpty(x.Namespace) && x.Namespace.Contains("ViewModels"));
 
             HandleConfigure(_builder);
             Container = _builder.Build();
@@ -79,6 +84,16 @@ namespace Caliburn.Micro.WinRT.Autofac
             SharingService = Container.Resolve<ISharingService>();
 
             _rootFrame = CreateApplicationFrame();
+        }
+
+        public virtual void RegisterViewModels(Predicate<Type> isViewModel)
+        {
+            _builder.RegisterAssemblyTypes(AssemblySource.Instance.ToArray())
+                .Where(x => isViewModel(x))
+                .AssignableTo<INotifyPropertyChanged>()
+                .AsSelf()
+                .InstancePerLifetimeScope()
+                .OnActivated(OnActivated);
         }
 
         protected virtual object LocateForView(object view)
@@ -124,6 +139,8 @@ namespace Caliburn.Micro.WinRT.Autofac
                 }
                 else
                 {
+                    //caliburn can ask for a Keyed service without providing the type,
+                    //to fullfil this we must scan the actual component registry
                     if (service == null)
                     {
                         var unTyped = Container.ComponentRegistry.Registrations.SelectMany(
@@ -160,9 +177,10 @@ namespace Caliburn.Micro.WinRT.Autofac
             _frameAdapter.BeginNavigationContext += FrameAdapterOnBeginNavigationContext;
             _frameAdapter.EndNavigationContext += FrameAdapterOnEndNavigationContext;
             _rootFrame.Navigating += RootFrameOnNavigating;
+            _rootFrame.Navigated += RootFrameOnNavigated;
         }
 
-        protected override Frame CreateApplicationFrame()
+        protected sealed override Frame CreateApplicationFrame()
         {
             if (_rootFrame == null)
             {
@@ -190,8 +208,15 @@ namespace Caliburn.Micro.WinRT.Autofac
             if (e.NavigationMode == NavigationMode.Back && !e.Cancel)
             {
                 var page = _rootFrame.Content as Page;
+
+                if (EnableViewCacheManagement && page != null)
+                {
+                    page.NavigationCacheMode = NavigationCacheMode.Disabled;
+                }
+
                 if (page != null && page.NavigationCacheMode == NavigationCacheMode.Disabled)
-                { //pages that have a cache mode of disabled won't be visited again
+                {
+                    //pages that have a cache mode of disabled won't be visited again
                     var key = _viewsToScope.Keys.FirstOrDefault(x => x.Target == page);
                     if (key != null)
                     {
@@ -214,6 +239,23 @@ namespace Caliburn.Micro.WinRT.Autofac
             }
         }
 
+        private void RootFrameOnNavigated(object sender, NavigationEventArgs e)
+        {
+            if (EnableViewCacheManagement)
+            {
+                if (e.NavigationMode == NavigationMode.New)
+                {
+                    var page = e.Content as Page;
+                    if (page != null)
+                        page.NavigationCacheMode = NavigationCacheMode.Required;
+                }
+                else if (e.NavigationMode == NavigationMode.Back)
+                {
+                    ResetPageCache();
+                }
+            }
+        }
+
         protected override void BuildUp(object instance)
         {
             Container.InjectProperties(instance);
@@ -230,6 +272,15 @@ namespace Caliburn.Micro.WinRT.Autofac
             {
                 handle(activation.Instance);
             }
+        }
+
+        private void ResetPageCache()
+        {
+            //Flush page instance cache using
+            //strategy seen here: http://www.jayway.com/2012/05/25/clearing-the-windows-8-page-cache/
+            var cacheSize = _rootFrame.CacheSize;
+            _rootFrame.CacheSize = 0;
+            _rootFrame.CacheSize = cacheSize;
         }
 
     }
