@@ -2,37 +2,31 @@
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
+using System.Reflection;
+using Windows.ApplicationModel.Activation;
 using Autofac;
 using Autofac.Core;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
 using System.Diagnostics;
 using Windows.UI.Xaml.Navigation;
+using Caliburn.Micro.WinRT.Autofac.StorageHandlers;
+
 namespace Caliburn.Micro.WinRT.Autofac
 {
-    public abstract class CaliburnAutofacApplication : CaliburnApplication
+    public abstract class CaliburnAutofacApplication : CaliburnApplication, IActivateComponent
     {
         protected IContainer Container;
         private readonly ContainerBuilder _builder;
         private AutofacFrameAdapter _frameAdapter;
         private Frame _rootFrame;
         readonly IDictionary<WeakReference, ILifetimeScope> _viewsToScope = new Dictionary<WeakReference, ILifetimeScope>();
-        private bool _enableViewCacheManagement = true;
         private static Type[] _exportedTypeCache;
+        private StorageCoordinator _storageCoordinator;
         protected object NavigationContext { get; set; }
 
         public event Action<object> Activated = _ => { };
         protected ISharingService SharingService { get; private set; }
-
-        /// <summary>
-        /// All pages in the back stack will be set to cachemode 'Required'.
-        /// When navigating away from a page, the view will be set to cachemode disabled and flushed, emulating behavior closer to WP8.
-        /// </summary>
-        public virtual bool EnableViewCacheManagement
-        {
-            get { return _enableViewCacheManagement; }
-            set { _enableViewCacheManagement = value; }
-        }
 
         protected CaliburnAutofacApplication()
         {
@@ -48,7 +42,21 @@ namespace Caliburn.Micro.WinRT.Autofac
             _builder.RegisterType<SharingService>().As<ISharingService>().SingleInstance();
             _builder.RegisterType<SettingsService>().As<ISettingsService>().SingleInstance();
 
-            RegisterViewModels(x => !string.IsNullOrEmpty(x.Namespace) && x.Namespace.Contains("ViewModels"));
+            _builder.RegisterAssemblyTypes(AssemblySource.Instance.Concat(new[] { typeof(IStorageMechanism).GetTypeInfo().Assembly }).ToArray())
+                .AssignableTo<IStorageMechanism>()
+                .AsImplementedInterfaces();
+
+            _builder.RegisterType<StorageCoordinator>().AsSelf().SingleInstance();
+
+            RegisterViewModels(x => !string.IsNullOrEmpty(x.Namespace) &&
+                x.Namespace.Contains("ViewModels") &&
+                    typeof(INotifyPropertyChanged).IsAssignableFrom(x));
+
+            _builder.RegisterAssemblyTypes(AssemblySource.Instance.ToArray())
+                .AssignableTo<IStorageHandler>()
+                .AsSelf()
+                .AsImplementedInterfaces()
+                .SingleInstance();
 
             HandleConfigure(_builder);
             Container = _builder.Build();
@@ -82,6 +90,8 @@ namespace Caliburn.Micro.WinRT.Autofac
             };
 
             SharingService = Container.Resolve<ISharingService>();
+            _storageCoordinator = Container.Resolve<StorageCoordinator>();
+            _storageCoordinator.Start();
 
             _rootFrame = CreateApplicationFrame();
         }
@@ -90,10 +100,9 @@ namespace Caliburn.Micro.WinRT.Autofac
         {
             _builder.RegisterAssemblyTypes(AssemblySource.Instance.ToArray())
                 .Where(x => isViewModel(x))
-                .AssignableTo<INotifyPropertyChanged>()
                 .AsSelf()
                 .InstancePerLifetimeScope()
-                .OnActivated(OnActivated);
+                .OnActivated(x => OnActivated(x));
         }
 
         protected virtual object LocateForView(object view)
@@ -177,7 +186,6 @@ namespace Caliburn.Micro.WinRT.Autofac
             _frameAdapter.BeginNavigationContext += FrameAdapterOnBeginNavigationContext;
             _frameAdapter.EndNavigationContext += FrameAdapterOnEndNavigationContext;
             _rootFrame.Navigating += RootFrameOnNavigating;
-            _rootFrame.Navigated += RootFrameOnNavigated;
         }
 
         protected sealed override Frame CreateApplicationFrame()
@@ -205,21 +213,22 @@ namespace Caliburn.Micro.WinRT.Autofac
 
         private void RootFrameOnNavigating(object sender, NavigatingCancelEventArgs e)
         {
-            if (e.NavigationMode == NavigationMode.Back && !e.Cancel)
+            var page = _rootFrame.Content as Page;
+
+            if (e.NavigationMode == NavigationMode.New)
             {
-                var page = _rootFrame.Content as Page;
+                _storageCoordinator.Save(StorageMode.Temporary);
+            }
 
-                if (EnableViewCacheManagement && page != null)
-                {
-                    page.NavigationCacheMode = NavigationCacheMode.Disabled;
-                }
-
+            if (!e.Cancel)
+            {
                 if (page != null && page.NavigationCacheMode == NavigationCacheMode.Disabled)
                 {
                     //pages that have a cache mode of disabled won't be visited again
-                    var key = _viewsToScope.Keys.FirstOrDefault(x => x.Target == page);
+                    var key = _viewsToScope.Keys.SingleOrDefault(x => x.Target == page);
                     if (key != null)
                     {
+                        _storageCoordinator.RemoveInstance(page.DataContext);
                         var scope = _viewsToScope[key];
                         scope.Dispose();
                         _viewsToScope.Remove(key);
@@ -239,22 +248,6 @@ namespace Caliburn.Micro.WinRT.Autofac
             }
         }
 
-        private void RootFrameOnNavigated(object sender, NavigationEventArgs e)
-        {
-            if (EnableViewCacheManagement)
-            {
-                if (e.NavigationMode == NavigationMode.New)
-                {
-                    var page = e.Content as Page;
-                    if (page != null)
-                        page.NavigationCacheMode = NavigationCacheMode.Required;
-                }
-                else if (e.NavigationMode == NavigationMode.Back)
-                {
-                    ResetPageCache();
-                }
-            }
-        }
 
         protected override void BuildUp(object instance)
         {
@@ -274,14 +267,21 @@ namespace Caliburn.Micro.WinRT.Autofac
             }
         }
 
-        private void ResetPageCache()
+        protected sealed override void OnLaunched(LaunchActivatedEventArgs args)
         {
-            //Flush page instance cache using
-            //strategy seen here: http://www.jayway.com/2012/05/25/clearing-the-windows-8-page-cache/
-            var cacheSize = _rootFrame.CacheSize;
-            _rootFrame.CacheSize = 0;
-            _rootFrame.CacheSize = cacheSize;
+            Initialise();
+
+            if (args.PreviousExecutionState == ApplicationExecutionState.ClosedByUser ||
+                args.PreviousExecutionState == ApplicationExecutionState.NotRunning)
+            {
+                _storageCoordinator.ClearLastSession();
+            }
+            HandleLaunched(args);
         }
 
+        protected virtual void HandleLaunched(LaunchActivatedEventArgs args)
+        {
+            
+        }
     }
 }

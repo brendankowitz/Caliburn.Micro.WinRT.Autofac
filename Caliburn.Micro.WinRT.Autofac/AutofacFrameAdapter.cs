@@ -1,5 +1,4 @@
 ﻿using System;
-using Caliburn.Micro;
 using Windows.UI.Xaml.Controls;
 using Windows.UI.Xaml.Navigation;
 

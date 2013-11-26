@@ -107,6 +107,20 @@
     <Compile Include="AutofacFrameAdapter.cs" />
     <Compile Include="CaliburnAutofacApplication.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="StorageHandlers\AppSettingsStorageMechanism.cs" />
+    <Compile Include="StorageHandlers\AsyncHelpers.cs" />
+    <Compile Include="StorageHandlers\IActivateComponent.cs" />
+    <Compile Include="StorageHandlers\IStorageHandler.cs" />
+    <Compile Include="StorageHandlers\IStorageMechanism.cs" />
+    <Compile Include="StorageHandlers\StorageCoordinator.cs" />
+    <Compile Include="StorageHandlers\StorageHandler.cs" />
+    <Compile Include="StorageHandlers\StorageInstruction.cs" />
+    <Compile Include="StorageHandlers\StorageInstructionBuilder.cs" />
+    <Compile Include="StorageHandlers\StorageInstructionExtensions.cs" />
+    <Compile Include="StorageHandlers\StorageMode.cs" />
+    <Compile Include="StorageHandlers\SuspensionManagerException.cs" />
+    <Compile Include="StorageHandlers\WinRTLocalStorageMechanism.cs" />
+    <Compile Include="StorageHandlers\WinRTRoamingStorageMechanism.cs" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="Autofac">
@@ -136,6 +150,7 @@
       <SubType>Designer</SubType>
     </None>
   </ItemGroup>
+  <ItemGroup />
   <PropertyGroup Condition=" '$(VisualStudioVersion)' == '' or '$(VisualStudioVersion)' &lt; '12.0' ">
     <VisualStudioVersion>12.0</VisualStudioVersion>
   </PropertyGroup>

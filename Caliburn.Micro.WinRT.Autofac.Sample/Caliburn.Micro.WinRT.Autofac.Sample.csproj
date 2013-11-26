@@ -113,6 +113,7 @@
     <Compile Include="Entities\Person.cs" />
     <Compile Include="Infrastructure\ActionCommand.cs" />
     <Compile Include="ViewModels\SecondViewModel.cs" />
+    <Compile Include="ViewModels\StorageHandlers\SecondViewStorageHandler.cs" />
     <Compile Include="ViewModels\ThirdViewModel.cs" />
     <Compile Include="Views\MainPage.xaml.cs">
       <DependentUpon>MainPage.xaml</DependentUpon>

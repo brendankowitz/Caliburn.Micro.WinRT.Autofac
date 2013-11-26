@@ -12,16 +12,13 @@ namespace Caliburn.Micro.WinRT.Autofac.Sample
             InitializeComponent();
         }
         
-        protected override void OnLaunched(LaunchActivatedEventArgs args)
+        protected override void HandleLaunched(LaunchActivatedEventArgs args)
         {
             DisplayRootView<MainPage>();
         }
 
         public override void HandleConfigure(ContainerBuilder builder)
         {
-            builder.RegisterAssemblyTypes(AssemblySource.Instance.ToArray())
-            .AsSelf()
-            .InstancePerDependency();
         }
     }
 }
